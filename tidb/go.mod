@@ -1,4 +1,4 @@
-module pingcap/talentplan/tidb/mergesort
+module pingcap/talentplan/tidb
 
 go 1.12
 
