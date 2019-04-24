@@ -2,6 +2,7 @@ package main
 
 import (
 	"sort"
+	"sync"
 	"testing"
 	cussort "pingcap/talentplan/tidb/common/alg/sort"
 )
@@ -31,7 +32,21 @@ func BenchmarkVer(b *testing.B) {
 		original := make([]int64, numElements)
 		prepare(original)
 		b.StartTimer()
-		cussort.Merge(original, 0 ,len(original) / 2, len(original) - 1, src)
+		l := len(original) / 10
+		wg := &sync.WaitGroup{}
+		for j, cur, end := 0, 0, 0; j < 10; j++ {
+			end = cur + l
+			if end > len(original) - 1 {
+				end = len(original) - 1
+			}
+			wg.Add(1)
+			go func(a int, b int) {
+				cussort.Merge(original, a, (a + b) / 2, b, src)
+				wg.Done()
+			}(cur, end)
+			cur = end + 1
+		}
+		wg.Wait()
 		b.StopTimer()
 	}
 }
