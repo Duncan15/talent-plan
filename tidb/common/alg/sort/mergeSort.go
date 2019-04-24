@@ -33,7 +33,7 @@ func mergeSortByMultiGoroutine(arr []int64, start int, end int, mergeLen int, tm
 		go mergeSortByMultiGoroutine(arr, start, mid, mergeLen, tmp, twg)
 		go mergeSortByMultiGoroutine(arr, mid + 1, end, mergeLen, tmp, twg)
 		twg.Wait()
-		merge(arr, start, mid, end, tmp)
+		Merge(arr, start, mid, end, tmp)
 	}
 }
 
@@ -45,9 +45,9 @@ func mergeSort(arr []int64, start int, end int, tmp []int64) {
 	mid := start + (end - start) / 2
 	mergeSort(arr, start, mid, tmp)
 	mergeSort(arr, mid + 1, end, tmp)
-	merge(arr, start, mid, end, tmp)
+	Merge(arr, start, mid, end, tmp)
  }
-func merge(arr []int64, start int, mid int, end int, tmp []int64)  {
+func Merge(arr []int64, start int, mid int, end int, tmp []int64)  {
 	index, i, j := start, start, mid + 1
 	for ; i <= mid && j <= end; index++ {
 		if arr[i] <= arr[j] {
