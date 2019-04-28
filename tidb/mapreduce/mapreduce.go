@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sort"
 	"strconv"
 	"sync"
 )
@@ -100,6 +101,7 @@ func (c *MRCluster) worker() {
 				results := t.mapF(t.mapFile, string(content))
 				for _, kv := range results {
 					enc := json.NewEncoder(bs[ihash(kv.Key)%t.nReduce])
+
 					if err := enc.Encode(&kv); err != nil {
 						log.Fatalln(err)
 					}
@@ -109,7 +111,41 @@ func (c *MRCluster) worker() {
 				}
 			} else {
 				// YOUR CODE HERE :)
-				panic("YOUR CODE HERE")
+				//t.phase == reducePhase
+				kvs := make([]KeyValue, 0)
+				for i := 0; i < t.nMap; i++ {
+					rpath := reduceName(t.dataDir, t.jobName, i, t.taskNumber)
+					f, r := OpenFileAndBuf(rpath)
+					dec := json.NewDecoder(r)
+					kv := &KeyValue{}
+					for dec.Decode(kv) == nil {
+						kvs = append(kvs, *kv)
+					}
+					f.Close()
+				}
+				sort.Slice(kvs, func(i, j int) bool {
+					if kvs[i].Key < kvs[j].Key {
+						return false
+					} else {
+						return true
+					}
+				})
+				mrPath := mergeName(t.dataDir, t.jobName, t.taskNumber)
+				f, w := CreateFileAndBuf(mrPath)
+				if len(kvs) != 0 {
+					preK := kvs[0].Key
+					valueSlice := make([]string, 0)
+					for _, kv := range kvs {
+						if kv.Key != preK {
+							w.WriteString(t.reduceF(preK, valueSlice))
+							valueSlice = make([]string, 0)
+							preK = kv.Key
+						}
+						valueSlice = append(valueSlice, kv.Value)
+					}
+					w.WriteString(t.reduceF(preK, valueSlice))
+				}
+				SafeClose(f, w)
 			}
 			t.wg.Done()
 		case <-c.exit:
@@ -156,7 +192,28 @@ func (c *MRCluster) run(jobName, dataDir string, mapF MapF, reduceF ReduceF, map
 
 	// reduce phase
 	// YOUR CODE HERE :D
-	panic("YOUR CODE HERE")
+	tasks = make([]*task, 0, nReduce)
+	for i := 0; i < nReduce; i++ {
+		t := &task{
+			dataDir: dataDir,
+			jobName: jobName,
+			phase: reducePhase,
+			taskNumber: i,
+			nMap: nMap,
+			reduceF: reduceF,
+		}
+		t.wg.Add(1)
+		tasks = append(tasks, t)
+		go func() { c.taskCh <- t }()
+	}
+	for _, t := range tasks {
+		t.wg.Wait()
+	}
+	mrFiles := make([]string, 0, nReduce)
+	for i := 0; i < nReduce; i++ {
+		mrFiles = append(mrFiles, mergeName(dataDir, jobName, i))
+	}
+	notify <- mrFiles
 }
 
 func ihash(s string) int {
