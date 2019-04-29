@@ -1,7 +1,7 @@
 .PHONY: all
 
-all: test_example test_homework cleanup gendata
-
+#all: test_example test_homework cleanup gendata
+all: cleanup test_example
 test_example:
 	go test -v -run=TestExampleURLTop -cpuprofile cpu.out -memprofile mem.out
 
@@ -13,3 +13,5 @@ cleanup:
 
 gendata:
 	go test -v -run=TestGenData
+test_chan:
+	go test -v -run=TestChannelSendAndReceive -cpuprofile chancpu.out -memprofile chanmem.out -count 10

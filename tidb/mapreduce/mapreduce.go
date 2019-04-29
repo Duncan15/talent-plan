@@ -2,15 +2,15 @@ package main
 
 import (
 	"bufio"
-	"encoding/json"
+	"fmt"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"runtime"
-	"sort"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -81,6 +81,9 @@ func (c *MRCluster) Start() {
 	}
 }
 
+//别看，看就是暴力优化！！！
+//1.replace the json serializing with raw io writing and reading
+//2.replace the sort with hash map
 func (c *MRCluster) worker() {
 	defer c.wg.Done()
 	for {
@@ -94,56 +97,54 @@ func (c *MRCluster) worker() {
 
 				fs := make([]*os.File, t.nReduce)
 				bs := make([]*bufio.Writer, t.nReduce)
+				outputs := make([][]*KeyValue, 0, len(fs))
 				for i := range fs {
 					rpath := reduceName(t.dataDir, t.jobName, t.taskNumber, i)
 					fs[i], bs[i] = CreateFileAndBuf(rpath)
+					outputs = append(outputs, make([]*KeyValue, 0))
 				}
 				results := t.mapF(t.mapFile, string(content))
-				for _, kv := range results {
-					enc := json.NewEncoder(bs[ihash(kv.Key)%t.nReduce])
-
-					if err := enc.Encode(&kv); err != nil {
-						log.Fatalln(err)
-					}
+				for i := range results {
+					index := ihash(results[i].Key) % t.nReduce
+					outputs[index] = append(outputs[index], &results[i])
 				}
 				for i := range fs {
+					for j := range outputs[i] {
+						fmt.Fprintf(bs[i], "%s:%s\n", outputs[i][j].Key, outputs[i][j].Value)
+					}
 					SafeClose(fs[i], bs[i])
 				}
 			} else {
 				// YOUR CODE HERE :)
 				//t.phase == reducePhase
-				kvs := make([]KeyValue, 0)
+				kvs := make([]*KeyValue, 0)
 				for i := 0; i < t.nMap; i++ {
 					rpath := reduceName(t.dataDir, t.jobName, i, t.taskNumber)
 					f, r := OpenFileAndBuf(rpath)
-					dec := json.NewDecoder(r)
-					kv := &KeyValue{}
-					for dec.Decode(kv) == nil {
-						kvs = append(kvs, *kv)
+					for true {
+						if str, err := r.ReadString('\n'); err == io.EOF {
+							break
+						} else {
+							strSlice := strings.Split(str, ":")
+							kvs = append(kvs, &KeyValue{strSlice[0], strSlice[1]})
+						}
 					}
 					f.Close()
 				}
-				sort.Slice(kvs, func(i, j int) bool {
-					if kvs[i].Key < kvs[j].Key {
-						return false
+				replaceMap := make(map[string][]string)
+				for i := range kvs {
+					if s, has := replaceMap[kvs[i].Key]; !has {
+						replaceMap[kvs[i].Key] = []string{kvs[i].Value}
 					} else {
-						return true
+						replaceMap[kvs[i].Key] = append(s, kvs[i].Value)
 					}
-				})
+				}
 				mrPath := mergeName(t.dataDir, t.jobName, t.taskNumber)
 				f, w := CreateFileAndBuf(mrPath)
-				if len(kvs) != 0 {
-					preK := kvs[0].Key
-					valueSlice := make([]string, 0)
-					for _, kv := range kvs {
-						if kv.Key != preK {
-							w.WriteString(t.reduceF(preK, valueSlice))
-							valueSlice = make([]string, 0)
-							preK = kv.Key
-						}
-						valueSlice = append(valueSlice, kv.Value)
+				if len(replaceMap) != 0 {
+					for k, v := range replaceMap {
+						w.WriteString(t.reduceF(k, v))
 					}
-					w.WriteString(t.reduceF(preK, valueSlice))
 				}
 				SafeClose(f, w)
 			}
@@ -188,6 +189,7 @@ func (c *MRCluster) run(jobName, dataDir string, mapF MapF, reduceF ReduceF, map
 	}
 	for _, t := range tasks {
 		t.wg.Wait()
+
 	}
 
 	// reduce phase

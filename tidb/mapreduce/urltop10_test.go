@@ -95,3 +95,22 @@ func testURLTop(t *testing.T, rounds RoundsArgs) {
 		}
 	}
 }
+
+func TestChannelSendAndReceive(t *testing.T) {
+	ch := make(chan string)
+	for i := 0; i < runtime.NumCPU(); i++ {
+		go func() {
+			for {
+				select {
+				case output := <- ch:
+					fmt.Println(output)
+				}
+			}
+
+		}()
+	}
+	for i := 0; i < 100; i++ {
+		ch <- "hello world"
+	}
+
+}

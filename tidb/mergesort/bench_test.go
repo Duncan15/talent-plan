@@ -1,10 +1,10 @@
 package main
 
 import (
+	cussort "pingcap/talentplan/tidb/common/alg/sort"
 	"sort"
 	"sync"
 	"testing"
-	cussort "pingcap/talentplan/tidb/common/alg/sort"
 )
 
 func compareAndSet(src []int64, original []int64)  {
@@ -52,6 +52,7 @@ func BenchmarkVer(b *testing.B) {
 }
 
 func BenchmarkMergeSort(b *testing.B) {
+	//runtime.GOMAXPROCS(1)
 	numElements := 16 << 20
 	src := make([]int64, numElements)
 	original := make([]int64, numElements)

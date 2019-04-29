@@ -1,1 +1,3 @@
 .idea/
+*cpu.out
+*mem.out
