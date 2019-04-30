@@ -125,6 +125,7 @@ func (c *MRCluster) worker() {
 						if str, err := r.ReadString('\n'); err == io.EOF {
 							break
 						} else {
+							str = strings.TrimSpace(str)
 							strSlice := strings.Split(str, ":")
 							kvs = append(kvs, &KeyValue{strSlice[0], strSlice[1]})
 						}

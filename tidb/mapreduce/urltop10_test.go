@@ -13,8 +13,8 @@ import (
 func testDataScale() ([]DataSize, []int) {
 	//dataSize := []DataSize{1 * MB, 10 * MB, 100 * MB, 500 * MB, 1 * GB}
 	//nMapFiles := []int{5, 10, 20, 40, 60}
-	dataSize := []DataSize{1 * MB, 10 * MB}
-	nMapFiles := []int{5, 10}
+	dataSize := []DataSize{1 * MB, 10 * MB, 100 * MB, 500 * MB}
+	nMapFiles := []int{5, 10, 20, 40}
 	return dataSize, nMapFiles
 }
 
@@ -94,23 +94,4 @@ func testURLTop(t *testing.T, rounds RoundsArgs) {
 			}
 		}
 	}
-}
-
-func TestChannelSendAndReceive(t *testing.T) {
-	ch := make(chan string)
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go func() {
-			for {
-				select {
-				case output := <- ch:
-					fmt.Println(output)
-				}
-			}
-
-		}()
-	}
-	for i := 0; i < 100; i++ {
-		ch <- "hello world"
-	}
-
 }
